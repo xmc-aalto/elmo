@@ -1,0 +1,119 @@
+#data related config
+data:
+  dataset: eurlex4k
+  is_lf_data: False
+  augment_label_data: False
+  use_filter_eval: False
+  num_labels: 3993
+  max_len: 128
+  num_workers: 8
+  batch_size: 32
+  test_batch_size: 32
+  dtype: float32
+  tokenized_loading: False
+
+#model related config
+model:
+  encoder:
+    encoder_model: "bert-base-uncased" #['sentence-transformers/all-roberta-large-v1','bert-base-uncased',
+                                                  #'sentence-transformers/msmarco-distilbert-base-v4']
+    encoder_tokenizer: "${dataset.model.encoder.encoder_model}"
+    encoder_ftr_dim: ${encoder_feature_size:${dataset.model.encoder.encoder_model}}
+    pool_mode: 'last_nhidden_conlast' #[last_nhidden_conlast,last_hidden_avg]
+    feature_layers: 1
+    embed_dropout: 0.8
+    use_torch_compile: True
+    use_ngame_encoder_weights: False
+    ngame_checkpoint: ./NGAME_ENCODERS/${data.dataset}/state_dict.pt
+    dtype: bfloat16
+
+  bottleneck:
+    use_bottleneck_layer: False
+    bottleneck_size: 4096
+    bottleneck_activation: relu
+    dtype: float32
+
+  xmc:
+    layer: dense
+    input_features: ${input_size_select:${dataset.model.bottleneck.use_bottleneck_layer},
+                          ${dataset.model.bottleneck.bottleneck_size},${dataset.model.encoder.feature_layers},${dataset.model.encoder.encoder_ftr_dim}}   #set based on penultimate value in Encoder
+    output_features: ${data.num_labels} #depends on num_labels in data
+    use_torch_compile: False
+    dtype: bfloat16
+    implementation: chunked  #auto selection of XMC class based on implementation type [chunked,]
+    num_chunks: 2
+
+#training related config
+training:
+  seed: 42
+
+  precision:
+    mode: custom  #[ purefp- uniform full precision, no amp or lower precision, custom-heterogeneous precision]
+    purelp_dtype: bfloat16
+
+  loss_fn: bce   # ['bce','squared_hinge'] # other loss currently doesn't support fused implementation
+  epochs: 71
+  training_steps: 1  #selected at runtime based on batch size and dataloader
+  
+  encoder:
+    lr: 5.0e-5  # learning rate
+    wd: 0.001   # weight decay
+    optimizer: adamw  # [adam,adamw,sgd]
+    momentum: 0 #used with sgd
+    lr_scheduler: CosineScheduleWithWarmup   #[MultiStepLR,CosineScheduleWithWarmup,ReduceLROnPlateau]
+    warmup_steps: 500
+    grad_accum_step: 1
+    implementation: optimi  #[optimi,pytorch,custom,adamwbf16]
+
+  xmc:
+    lr: 0.005  # learning rate
+    wd: 0.0001   # weight decay
+    optimizer: sgd  # [adam,adamw,sgd]
+    momentum: 0  #used with sgd
+    lr_scheduler: CosineScheduleWithWarmup   #[MultiStepLR,CosineScheduleWithWarmup,ReduceLROnPlateau]
+    warmup_steps: 1000
+    implementation: pytorch  #[optimi,pytorch,custom,adamwbf16]
+
+  bottleneck:
+    lr: ${encoder_optimizer.lr}
+    wd: ${encoder_optimizer.wd}
+    
+  FP8:
+    fp8_embed: True
+    use_scaled_mm: False
+    use_fp8_encoder: False
+    fp8_encoder_delayed_scaling: False
+    head_ratio: 0.2
+    using_head_kahan: False
+    debug_magnitude: False
+    debug_data_path: "./"
+    num_split: 4
+
+  evaluation:
+    train_evaluate: True
+    train_evaluate_every: 10
+    test_evaluate_every: 1
+    A: 0.6  # for propensity calculation
+    B: 2.6  # for propensity calculation
+    eval_psp: True
+    eval_recall: False
+    eval_ndcg: False
+    eval_psr: False
+
+  verbose:
+    show_iter: False  # print loss during training
+    print_iter: 2000  # how often (iteration) to print
+    use_wandb: False
+    wandb_runname: none
+    logging: True
+    log_fname: log_amazon670k
+    
+  use_checkpoint: True  #whether to use automatic checkpoint
+  checkpoint_file: PBCE3
+  best_p1: 0.49  # to store the model above this performance in case of automatic checkpoint
+  grad_analysis: False # whether to analyze gradient norms
+
+  exmy:
+    use_exmy: False
+    e: 4
+    m: 7
