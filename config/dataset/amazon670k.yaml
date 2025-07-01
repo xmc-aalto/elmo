@@ -11,7 +11,7 @@ data:
   test_batch_size: 64
   dtype: float32
   label_sort: True
-  tokenized_loading: True
+  tokenized_loading: False
 
 #model related config
 model:
