@@ -3,18 +3,13 @@ from torch.utils.data import Dataset, DataLoader
 from transformers import AutoTokenizer
 import json
 import numpy as np
-from tqdm import tqdm
-import math
 import os
 from preprocess import tokenize_file
 
 
 
-name_map = {'eurlex4k': 'Eurlex-4K', 'amazoncat13k': 'AmazonCat-13K','wiki31k': 'Wiki10-31K', 'amazon670k': 'Amazon-670K',
-            'amazontitles670k':'AmazonTitles-670K','wiki500k': 'Wiki-500K','amazon3m':'Amazon-3M', 
-            'amazontitles3m':'AmazonTitles-3M','lfamazon131k':'LF-Amazon-131K', 'lfamazontitles131k':'LF-AmazonTitles-131K',
-                'lfwikiseealso320k':'LF-WikiSeeAlso-320k', 'lfwikiseealsotitles320k':'LF-WikiSeeAlsoTitles-320k',
-              'lfamazontitles1.3m':'LF-AmazonTitles-1.3M'}
+name_map = { 'amazon670k': 'Amazon-670K', 'amazontitles670k':'AmazonTitles-670K','wiki500k': 'Wiki-500K','amazon3m':'Amazon-3M', 
+             'lfamazontitles131k':'LF-AmazonTitles-131K', 'lfwikiseealso320k':'LF-WikiSeeAlso-320k', 'lfamazontitles1.3m':'LF-AmazonTitles-1.3M'}
 dtype_map = {'float16':torch.float16, 'bfloat16':torch.bfloat16}
 
 
@@ -218,13 +213,17 @@ class DataHandler:
             batch_size = self.cfg.data.batch_size
             workers = self.cfg.data.num_workers
             pin_mem=True
-            if self.cfg.model.xmc.implementation in ["fp8chunked", "fp8chunkeddropxmc", "fp8chunkedfuseall", "fp8chunkedheadkahan"]:
+            if self.cfg.model.xmc.implementation in ["fp8chunked", "fp8chunkedheadkahan"]:
                 drop_last = True
         return DataLoader(dset, batch_size=batch_size, num_workers=workers, pin_memory=pin_mem, persistent_workers = True, prefetch_factor=2,
                           drop_last=drop_last,shuffle=shuffle, collate_fn=collate)
 
 
 class SimpleDataset(Dataset):
+    '''
+    Tokenization on the fly during batching.
+    
+    '''
     
     def __init__(self,cfg,raw_texts,labels,label_map,mode='train',task='evaluate'):
         super(SimpleDataset).__init__()
@@ -261,6 +260,10 @@ class SimpleDataset(Dataset):
  
     
 class SimpleTokenizedDataset(Dataset):
+    '''
+    Requires pre-tokenized data.
+    
+    '''
     
     def __init__(self,cfg,tokenized_filename,nsample,labels,label_map,pad_token_id,mode='train',task='evaluate'):
         super(SimpleTokenizedDataset,self).__init__()

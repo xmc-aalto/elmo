@@ -10,7 +10,7 @@ data:
   batch_size: 128
   test_batch_size: 128
   dtype: float32
-  label_sort: True
+  label_sort: False
   tokenized_loading: False
 
 #model related config
@@ -73,8 +73,7 @@ training:
     momentum: 0  #used with sgd
     lr_scheduler: CosineScheduleWithWarmup   #[MultiStepLR,CosineScheduleWithWarmup,ReduceLROnPlateau]
     warmup_steps: 5000
-    implementation: pytorch  #[optimi,pytorch,custom,adamwbf16]
-    fake_fp8_matmul: False
+    simulated_fp8: False
 
   bottleneck:
     lr: ${encoder_optimizer.lr}
@@ -116,9 +115,3 @@ training:
   checkpoint_file: lf2keywords
   load_checkpoint_file: None
   best_p1: 0.2  # to store the model above this performance in case of automatic checkpoint
-  grad_analysis: False # whether to analyze gradient norms
-
-  exmy:
-    use_exmy: False
-    e: 4
-    m: 7

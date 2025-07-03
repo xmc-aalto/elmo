@@ -57,7 +57,7 @@ class Logger:
             self.logfile(log_str)
             self.logfile(param_count)
         if self.cfg.training.verbose.use_wandb:
-            #wandb.login('allow','ecac97d7ac1dbaa85d3a07d5c098e9fc316e94e6')
+            #wandb.login('allow','')
             project_name = "LPXMC"
             self.run  = wandb.init(project=project_name,config=to_wandb_dict(self.cfg),name=self.cfg.training.verbose.wandb_runname)
                 
@@ -168,12 +168,6 @@ class Logger:
     
     def step(self,epoch):
         
-        grad_encoder = sum(self.grad_norm_encoder)/len(self.grad_norm_encoder) if self.cfg.training.grad_analysis else None
-        grad_final = sum(self.grad_norm_xmc)/len(self.grad_norm_xmc) if self.cfg.training.grad_analysis else None
-        grad_combined = sum(self.grad_norm_combined)/len(self.grad_norm_combined) if self.cfg.training.grad_analysis else None
-        trust_ratio = sum(self.trust_ratio_sparse)/len(self.trust_ratio_sparse) if self.cfg.training.grad_analysis else None
-
-        
         r1 = self.r1[-1] if self.cfg.training.evaluation.eval_recall else 0
         r3 = self.r3[-1] if self.cfg.training.evaluation.eval_recall else 0
         r5 = self.r5[-1] if self.cfg.training.evaluation.eval_recall else 0
@@ -191,10 +185,6 @@ class Logger:
                         "test_R@k":[r1,r3,r5],
                         "train_P@k":[trnp1,trnp3,trnp5],
                         "LR_XMC":self.xmc_lr[-1],"LR_Encoder":self.encoder_lr[-1],
-                        "grad_encoder":grad_encoder,
-                        "grad_final":grad_final,
-                        "grad_combined":grad_combined,
-                        "trustratio_final":trust_ratio,
                         "memory":self.mem[-1],"peak_memory":self.max_mem[-1]}})
             
         
@@ -210,44 +200,10 @@ class Logger:
         self.grad_iter = [] # for wandb workaround
         self.trust_ratio_sparse = [] #norm/grad for layer (could be useful for large batch stability analysis)
         
-    def grad_logging(self):
-        if self.cfg.training.verbose.use_wandb:
-            for  i in range(len(self.grad_norm_xmc)):
-                self.run.log({'Grad_Norm_Out':self.grad_norm_xmc[i], 'Grad_Norm_Encoder':self.grad_norm_encoder[i],
-                            'Grad_Norm_Combined':self.grad_norm_combined[i],'Trust_Ratio_Sparse':self.trust_ratio_sparse[i],
-                            'iteration':self.grad_iter[i]})
         
     def finalize(self):
         if self.cfg.training.verbose.use_wandb:
-            wandb.finish()
-            
-            
-            
-    def grad_logger(self,model,total_iter):
-        '''
-        to log gradients after each iteration or each n iterations with gradient accumulation.
-        
-        '''
-        self.grad_iter.append(total_iter)
-
-        grad_flayer = model.linear.weight.grad.norm().item()
-        norm_flayer = model.linear.weight.norm().item() 
-        self.grad_norm_xmc.append(grad_flayer)
-        self.trust_ratio_sparse.append(norm_flayer/grad_flayer)
-        gradient_norms = []
-        for name, parameter in model.encoder.named_parameters():
-            # Only consider the encoder layers
-            #if "encoder" in name and parameter.grad is not None:
-            gradient_norm = parameter.grad.norm().item()
-            gradient_norms.append(gradient_norm)
-        # Compute the average gradient norm
-        self.grad_norm_encoder.append(sum(gradient_norms) / len(gradient_norms))
-        gradient_norms.append(grad_flayer)
-        if self.cfg.model.bottleneck.use_bottleneck_layer:
-            gradient_norms.append(model.bottleneck.weight.grad.norm().item())
-        self.grad_norm_combined.append(sum(gradient_norms) / len(gradient_norms)) 
-        #print(total_iter,self.trust_ratio_sparse)
-        
+            wandb.finish()   
         
 
 def to_wandb_dict(cfg):
@@ -283,8 +239,6 @@ def to_wandb_dict(cfg):
     wandb_cfg['lr'] = cfg.training.xmc.lr
     wandb_cfg['wd_encoder'] = cfg.training.encoder.wd
     wandb_cfg['warmup_steps'] = cfg.training.encoder.warmup_steps
-    wandb_cfg['exmy_e'] = cfg.training.exmy.e
-    wandb_cfg['exmy_m'] = cfg.training.exmy.m
     
     
     #Precision related Config #TODO 

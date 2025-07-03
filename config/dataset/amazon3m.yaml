@@ -4,13 +4,13 @@ data:
   is_lf_data: False
   augment_label_data: False
   use_filter_eval: False
-  num_labels: 2812281  #120000000 #18000000 #15000000 #10000000 #7500000  #5000000 #2812281
+  num_labels: 2812281  
   max_len: 128
   num_workers: 8
   batch_size: 128
   test_batch_size: 128
   dtype: float32
-  label_sort: True
+  label_sort: False
   tokenized_loading: False
 
 #model related config
@@ -75,8 +75,7 @@ training:
     momentum: 0  #used with sgd
     lr_scheduler: CosineScheduleWithWarmup   #[MultiStepLR,CosineScheduleWithWarmup,ReduceLROnPlateau]
     warmup_steps: 10000
-    implementation: pytorch  #[optimi,pytorch,custom,adamwbf16]
-    fake_fp8_matmul: False
+    simulated_fp8: False
 
   bottleneck:
     lr: ${encoder_optimizer.lr}
@@ -113,12 +112,6 @@ training:
     logging: True
     log_fname: log_amazon670k
     
-  use_checkpoint: True  #whether to use automatic checkpoint
+  use_checkpoint: False  #whether to use automatic checkpoint
   checkpoint_file: amazon3m
   best_p1: 0.54  # to store the model above this performance in case of automatic checkpoint
-  grad_analysis: False # whether to analyze gradient norms
-
-  exmy:
-    use_exmy: False
-    e: 4
-    m: 7
