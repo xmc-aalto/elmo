@@ -8,49 +8,19 @@ from optimi import AdamW as CAdamW
 from optimi import Adam as CAdam
 from optimi import SGD as CSGD
 from optimi import Adam as CAdam
-from adamw_bf16 import AdamWBF16
-from optim import AdamW_SR
 import transformers
 
 from log import Logger
 from model import SimpleTModel
 from evaluate import Evaluator
-from utils import print_trainable_parameters, EarlyStopping, get_memory_stats
+from utils import print_trainable_parameters, EarlyStopping
 from evaluate import sparsification
 
-#from pickle import dump
-#from torchao.float8 import sync_float8_amax_and_scale_history
-
-#import time
-#from torch.profiler import schedule
-#from torch.profiler import profile, record_function, ProfilerActivity
-
-#import torch_exmy
-
-  
-    
-def trace_handler(p):
-    '''
-    For Timing Profiling. For temporary usage
-    
-    '''
-    sort_by_keyword = "self_" + 'cuda' + "_time_total"
-    output = p.key_averages().table(sort_by=sort_by_keyword, row_limit=25)
-    print(output)
-    p.export_chrome_trace("Profiling/vanilla_timing4"+".json")
 
 
 dtype_map = {'float16':torch.float16, 'bfloat16':torch.bfloat16,'float32':torch.float32}
 optimizer_map_optimi = {'adam':CAdam,'adamw':CAdamW,'sgd':CSGD}
 optimizer_map_torch = {'adam':Adam,'adamw':AdamW,'sgd':SGD}
-optimizer_map_custom = {'adamw':AdamW_SR}
-
-
-def gradient_hook(grad):
-    print("Gradient dtype:", grad.dtype)
-    print(f"Grad mean:{grad.mean()} Grad max:{grad.max()} Grad min:{grad.min()}")
-    #grad = torch.clamp_(grad,min=-65504,max=65504)
-    return grad
     
 
 class Runner:
@@ -83,13 +53,11 @@ class Runner:
         if cfg.model.encoder.use_ngame_encoder_weights:
             self._load_ngame_encoder()
         
-        # for name, tensor in self.model.state_dict().items():
-        #     print(f"{name} has dtype {tensor.dtype}")
 
         self.optimizer_encoder = self._get_optimizer(cfg,param_list_encoder,cfg.training.encoder.optimizer,
                                                      cfg.training.encoder.implementation,cfg.training.encoder.lr,cfg.training.encoder.momentum)
         
-        #currently we use dummy optimizer to use existing LR scheduler
+        # dummy single parameter optimizer to use existing LR scheduler
         self.optimizer_xmc = torch.optim.SGD(torch.nn.ParameterList([torch.nn.Parameter(torch.zeros(1))]), lr=cfg.training.xmc.lr)
 
             
@@ -99,7 +67,7 @@ class Runner:
                                                        cfg.training.xmc.warmup_steps,min_lr=0.001)
         
 
-        self.early_stopping = EarlyStopping(patience=105,delta=5e-5,mode='max')
+        self.early_stopping = EarlyStopping(patience=25,delta=5e-5,mode='max')
         
     
         #Evaluators initialization
@@ -125,19 +93,6 @@ class Runner:
             return optimizer_map_torch[optimizer](param_list)
         elif implementation in ['optimi']:
             return optimizer_map_optimi[optimizer](param_list,lr=lr,kahan_sum=kahan,weight_decay=self.cfg.training.encoder.wd) #,foreach=False
-        elif implementation in ['adamwsr']:
-            return AdamW_SR(param_list, lr=lr)
-        elif implementation=='bnb':
-            import bitsandbytes as bnb
-            if optimizer=='adam':
-                return bnb.optim.Adam(param_list,lr=lr)
-            else:
-                raise ValueError('Only Adam is supported for bits and bytes')
-        elif implementation=='custom':
-            if optimizer=='adamw':
-                return optimizer_map_custom[optimizer](param_list,lr=lr,weight_decay=self.cfg.training.encoder.wd) #currently wd is hardcoded to encoder
-            else:
-                raise ValueError('Only AdamW is supported for Custom implementation now')
         else:
             raise ValueError('Only two optimizer implementation modes supported now')
 
@@ -163,30 +118,30 @@ class Runner:
         return scheduler
         
     
-    #@timeit
-    def run_one_epoch(self,epoch,train_loader):
+    def run_one_epoch(self,epoch: int,train_loader) -> int:
+        '''
+        Train model for one epoch.
+        Args:
+            epoch: current epoch number
+            train_loader: dataloader for the train set
+        
+        '''
         epoch_loss = 0
         loss_nprint = 1
-        loss_print_every = 8000000
+        loss_print_every = 8000000 # if > num_iter, never calculate and print the loss (use skip loss)
         bar = tqdm(total=len(train_loader))
         bar.set_description(f'{epoch}')
         self.model.zero_grad()
         self.model.train()
         
-        # activities = [ProfilerActivity.CPU, ProfilerActivity.CUDA] # profiling
-        
-        #with profile(activities=activities,schedule=torch.profiler.schedule(wait=10,warmup=30,active=10),on_trace_ready=trace_handler) as p:
         for i,data in enumerate(train_loader):
 
-            #with record_function("data_loading"):
             tokens,mask,labels = data
             tokens, mask, labels = tokens.to(self.device),mask.to(self.device), labels.to(self.device)
             bsz = tokens.shape[0]
 
-            #with record_function("encoder_forward_pass"):
             out = self.model(tokens,mask)
             
-            #with record_function("XMC_first_pass"):
             if (i+1)% loss_print_every==0:
                 loss = self.model.xfc.xfc_forward_backward(out,labels,self.lr_scheduler_xmc.get_last_lr(),skip_loss=False)
                 epoch_loss += loss
@@ -196,37 +151,25 @@ class Runner:
                 epoch_loss += loss
                 loss_nprint += 1
 
-            #with record_function("encoder_backward"):
-            # need to divide input gradient by grad_accum_step (this is same as dividing the loss by grad_accum_step)
+            #grad accumulation on encoder
             self.model.xfc.grad_input[0:bsz, :].div_(self.cfg.training.encoder.grad_accum_step) 
+            #autograd engine for encoder backward pass 
             out.backward(self.model.xfc.grad_input[0:bsz,:]) 
             
             
-            
             if (i+1) % self.cfg.training.encoder.grad_accum_step==0:
-            
-            #with record_function("encoder_optimizer_step"):
                 self.optimizer_encoder.step()
                 self.optimizer_encoder.zero_grad(set_to_none=True)
                 
             self.lr_scheduler_encoder.step()
             self.lr_scheduler_xmc.step() # XMC update is independent of grad_accum_step
             
-            if i == 12 and (epoch == 0 or epoch == 1):
-                # torch.cuda.memory._dump_snapshot("my_snapshot.pickle")
-                print(get_memory_stats(self.device))
-
-
             if self.cfg.training.verbose.logging:
                 self.LOG.iter_loss.append(loss)
 
             self.total_iter +=1
             bar.update(1)
             bar.set_postfix(loss=epoch_loss)  
-
-            # if i ==11: #for memory snapshot
-            #     break     
-                #p.step()
                 
 
         return epoch_loss/ loss_nprint
@@ -246,27 +189,9 @@ class Runner:
             self.LOG.model_memory_logging()
 
         for epoch in range(self.cfg.training.epochs):
-            
-            #code for precision change (ignore this part)
-            # if epoch==2 and self.cfg.training.precision.mode=='custom':
-            #     self.model.xfc.xfc_weight = self.model.xfc.xfc_weight.to(torch.float32)
-            #     self.model.xfc._dtype=torch.float32
-            #     self.model.encoder = self.model.encoder.to(torch.float32)
-            #     self.model.dropout = self.model.dropout.to(torch.float32)
-            #     self.model._dtype = torch.float32
-
                 
             epoch_loss = self.run_one_epoch(epoch,train_loader)
             print(f'Epoch:{epoch+1}   Epoch Loss: {epoch_loss:.7f}')
-            
-            # # #for memory snapshot
-            # s= torch.cuda.memory._snapshot()
-            # with open(f"a3m_one_iteration.pickle", "wb") as f:
-            #     dump(s, f)
-                
-            # # tell CUDA to stop recording memory allocations now
-            # torch.cuda.memory._record_memory_history(enabled=None)
-            # # break
             
             if self.cfg.training.verbose.logging:
                 self.LOG.loss_logging(epoch,epoch_loss)
@@ -281,7 +206,7 @@ class Runner:
 
                 if tp1>self.cfg.training.best_p1 and self.cfg.training.use_checkpoint:
                     self.best_p1 = tp1
-                    temp = 'LP' #renaming this dynamically from precision settings #TODO
+                    temp = 'LP' 
                     temp = temp +'_' + self.cfg.training.checkpoint_file
                     if not os.path.exists(f'models/{self.cfg.data.dataset}/'):
                         os.makedirs(f'models/{self.cfg.data.dataset}/')
@@ -294,9 +219,6 @@ class Runner:
                 if self.cfg.training.verbose.logging:
                     self.LOG.train_perf_logging(epoch,metrics)
  
-            #Grad Norm logging (for gradient experiments)
-            if self.cfg.training.grad_analysis and self.cfg.training.verbose.logging:
-                self.LOG.grad_logging()
 
             if self.running_evaluation:
                 self.early_stopping(tp3)

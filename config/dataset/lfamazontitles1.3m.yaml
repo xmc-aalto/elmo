@@ -75,8 +75,7 @@ training:
     momentum: 0  #used with sgd
     lr_scheduler: CosineScheduleWithWarmup   #[MultiStepLR,CosineScheduleWithWarmup,ReduceLROnPlateau]
     warmup_steps: 15000
-    implementation: pytorch  #[optimi,pytorch,custom,adamwbf16]
-    fake_fp8_matmul: False
+    simulated_fp8: False
   bottleneck:
     lr: ${encoder_optimizer.lr}
     wd: ${encoder_optimizer.wd}
@@ -116,9 +115,3 @@ training:
   checkpoint_file: PBCE3
   load_checkpoint_file: None
   best_p1: 0.50  # to store the model above this performance in case of automatic checkpoint
-  grad_analysis: False # whether to analyze gradient norms
-
-  exmy:
-    use_exmy: False
-    e: 4
-    m: 7

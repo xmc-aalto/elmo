@@ -3,7 +3,6 @@ import torch
 import scipy.sparse as sp
 import xclib.evaluation.xc_metrics as xc_metrics
 import itertools
-from utils import timeit,dense_to_sparse
 from tqdm import tqdm
 from scipy.sparse import csr_matrix
 

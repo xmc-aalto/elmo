@@ -3,15 +3,8 @@ from torch import nn
 import torch.nn.functional as F
 from transformers import AutoModel, AutoConfig
 
-#import time
-#from torch.profiler import schedule
-#from torch.profiler import profile, record_function, ProfilerActivity
-
 
 dtype_map = {'float16':torch.float16, 'bfloat16':torch.bfloat16,'float32':torch.float32, 'float8':torch.float8_e4m3fn}
-
-def gradient_hook(grad):
-    print("Gradient dtype:", grad.dtype)
 
 
 class TransformerEncoder(nn.Module):
@@ -29,7 +22,6 @@ class TransformerEncoder(nn.Module):
     def load_transformer_model(self, cfg):
         """ Load transformer model based on the provided configuration. """
         model_config = AutoConfig.from_pretrained(cfg.model.encoder.encoder_model)
-        #model_config.gradient_checkpointing = True
         model_config.output_hidden_states = True
         try:
             return AutoModel.from_pretrained(
@@ -117,10 +109,9 @@ class SimpleTModel(nn.Module):
         self.encoder_dtype = dtype_map[cfg.training.precision.purelp_dtype] if cfg.training.precision.mode in ['purelp'] else self.encoder_dtype
 
         self.encoder = TransformerEncoder(cfg,self.encoder_dtype).to(self.encoder_dtype)
-        #print(self.encoder)
         self.configure_components(cfg)
         
-        # Potential place to initialize FP8 Encoder
+        # Initialize FP8 Encoder from torchao
         if self.cfg.training.FP8.use_fp8_encoder:
             # optional: filter modules from being eligible for float8 conversion
             from torchao.float8 import convert_to_float8_training
@@ -149,11 +140,11 @@ class SimpleTModel(nn.Module):
                 cfg.model.bottleneck.bottleneck_size
             ).to(dtype_map[cfg.model.bottleneck.dtype]).to(self.device)
 
-        #select XMC layer type based on implementation and dtype [implementations are in src/implementations/]
+        #select XMC layer type based on implementation and dtype [implementations are in src/xmc_classifiers/]
         if cfg.training.loss_fn=='bce':
             if cfg.model.xmc.implementation=="chunked":
                 from xmc_classifiers.chunked import XMCBCECHUNKEDLayer
-                self.xfc = XMCBCECHUNKEDLayer(cfg) #XMCBCESPLITLayer(cfg) #XMCBCEPMOLayer(cfg) #memtest
+                self.xfc = XMCBCECHUNKEDLayer(cfg)
 
             elif cfg.model.xmc.implementation=="fp8chunked":
                 from xmc_classifiers.chunked_fp8xmc_clf import Fp8XMCBCEChunkedLayer
@@ -161,18 +152,6 @@ class SimpleTModel(nn.Module):
             elif cfg.model.xmc.implementation=="fp8chunkedheadkahan":
                 from xmc_classifiers.chunked_head_kahan_fp8xmc_clf import Fp8XMCBCEChunkedHeadKahanLayer
                 self.xfc = Fp8XMCBCEChunkedHeadKahanLayer(cfg)
-            elif cfg.model.xmc.implementation=="fp8chunkedfuseall":
-                from xmc_classifiers.chunked_fp8xmc_fuseall_clf import Fp8XMCBCEChunkedFuseAllLayer
-                self.xfc = Fp8XMCBCEChunkedFuseAllLayer(cfg)
-            elif cfg.model.xmc.implementation=="fp8chunkeddropxmc":
-                from xmc_classifiers.chunked_fp8xmc_dropclf import Fp8DropXMCBCEChunkedLayer
-                self.xfc = Fp8DropXMCBCEChunkedLayer(cfg)
-            elif cfg.model.xmc.implementation=="shortlistclf":
-                from xmc_classifiers.xmc_shortlist_clf import XMCShortlistLayer
-                self.xfc = XMCShortlistLayer(cfg)
-            elif cfg.model.xmc.implementation=="xmcclf":
-                from xmc_classifiers.xmc_clf import XMCClfLayer
-                self.xfc = XMCClfLayer(cfg)
             else:
                 raise ValueError('Other method than chunked doesn\'t support yet.')
                 

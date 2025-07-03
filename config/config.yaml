@@ -1,11 +1,11 @@
 defaults:
   - environment: env
-  - dataset: lfamazontitles131k
+  - dataset: amazontitles670k
   - _self_
 
 
 dataset_path: ""
 use_wandb: False
-wandb_runname: "AT131K_test"
+wandb_runname: "AT670K_test"
 log_fname: log_${wandb_runname}
 job_num: ${hydra:job.num}

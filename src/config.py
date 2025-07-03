@@ -2,15 +2,16 @@ import os
 from dataclasses import dataclass, field
 from omegaconf import DictConfig
 
-
 @dataclass
 class EnvironmentConfig:
     '''
     Configuration related to the running environment of the system.
     '''
-    running_env: str = "aalto-lab"
+    running_env: str = "guest"
     cuda_device_id: int = 0
     device: str = "cuda"
+    wandb_api: str = "api"
+    wandb_project: str = "LP"
 
 @dataclass
 class DataConfig:
@@ -109,7 +110,7 @@ class TXMCConfig:
     momentum: float = 0 # used with sgd 
     lr_scheduler: str = "CosineScheduleWithWarmup"   #[MultiStepLR,CosineScheduleWithWarmup,ReduceLROnPlateau]
     warmup_steps: int = 500
-    implementation: str = "pytorch"  #[optimi,pytorch,custom]
+    simulated_fp8: bool = False
 
 @dataclass
 class TbottleneckConfig:
@@ -153,12 +154,6 @@ class VerboseConfig:
     use_checkpoint: bool = False  #whether to use automatic checkpoint
     best_p1: float = 0.462  # to store the model above this performance in case of automatic checkpoint
     
-@dataclass
-class exmyConfig:
-    use_exmy: bool = False
-    e: int = 8
-    m: int = 7
-    
 
 @dataclass
 class TrainingConfig:
@@ -177,8 +172,6 @@ class TrainingConfig:
     checkpoint_file: str = "PBCE3"
     load_checkpoint_file: str = "None"
     best_p1: float = 0.50  # to store the model above this performance in case of automatic checkpoint
-    grad_analysis: bool = False # whether to analyze gradient norms
-    exmy: exmyConfig = field(default_factory=exmyConfig)
 
 @dataclass
 class DatasetConfig:
@@ -216,64 +209,6 @@ def validate_config(cfg: DictConfig):
 ##---------------------------------------Dataset Paths Configuration-------------------------------------------------##
 ##-------------------------------------------------------------------------------------------------------------------##
     
-class PathWiki31K:
-    '''
-    Wiki10-31K Dataset.
-    '''
-    def __init__(self,root_path):
-        
-        self.root_folder = 'Wiki10-31K'
-        self.dataset_path = os.path.join(root_path,self.root_folder)
-
-        #Raw Data and Labels
-        self.train_raw_texts = os.path.join(self.dataset_path,'train_raw_texts.txt')
-        self.test_raw_texts = os.path.join(self.dataset_path,'test_raw_texts.txt')
-        self.train_labels = os.path.join(self.dataset_path,'train_labels.txt')
-        self.test_labels = os.path.join(self.dataset_path,'test_labels.txt')
-        #BOW features
-        self.bow_path = os.path.join(self.dataset_path,'BOW')
-        self.bow_train_path = os.path.join(self.bow_path,'train.txt')
-        self.bow_test_path = os.path.join(self.bow_path,'test.txt')
-        self.bowXf_path = os.path.join(self.bow_path,'Xf.txt')
-        self.bowY_path = os.path.join(self.bow_path,'Y.txt')
-
-
-class PathEurlex4K:
-    '''
-    EurLex-4K Dataset.
-    
-    '''
-    def __init__(self,root_path):
-
-        self.root_folder = 'Eurlex-4K'
-        self.dataset_path = os.path.join(root_path,self.root_folder)
-
-        #Raw Data and Labels
-        self.train_raw_texts = os.path.join(self.dataset_path,'train_texts.txt')
-        self.test_raw_texts = os.path.join(self.dataset_path,'test_texts.txt')
-        self.train_labels = os.path.join(self.dataset_path,'train_labels.txt')
-        self.test_labels = os.path.join(self.dataset_path,'test_labels.txt')
-        #BOW features
-        self.bow_train_path = os.path.join(self.dataset_path,'train.txt')
-        self.bow_test_path = os.path.join(self.dataset_path,'test.txt')
-
-class PathAmazonCat13K:
-    '''
-    AmazonCat-13K Dataset.
-    
-    '''
-    def __init__(self,root_path):
-        
-        self.root_folder = 'AmazonCat-13K'
-        self.dataset_path = os.path.join(root_path,self.root_folder)
-
-        #Raw Data and Labels
-        self.train_raw_texts = os.path.join(self.dataset_path,'train_raw_texts.txt')
-        self.test_raw_texts = os.path.join(self.dataset_path,'test_raw_texts.txt')
-        self.train_labels = os.path.join(self.dataset_path,'train_labels.txt')
-        self.test_labels = os.path.join(self.dataset_path,'test_labels.txt')
-        
-
 
 class PathAmazon670K:
     '''
@@ -351,25 +286,7 @@ class PathAmazon3M:
         self.bow_train_path = os.path.join(self.dataset_path,'train_v1.txt')
         self.bow_test_path = os.path.join(self.dataset_path,'BOW/test.txt')
         
-        
-class PathAmazonTitles3M:
-    '''
-    AmazonTitles-670K Dataset.
-    '''
-    def __init__(self,root_path):
 
-        self.root_folder = 'AmazonTitles-3M'
-        self.dataset_path = os.path.join(root_path,self.root_folder)
-
-        #Raw text
-        self.train_json = os.path.join(self.dataset_path,'trn.json')
-        self.test_json = os.path.join(self.dataset_path,'tst.json')
-        #self.filter_labels_train = os.path.join(self.raw_text_path,'filter_labels_train.txt')
-        #self.filter_labels_test = os.path.join(self.raw_text_path,'filter_labels_test.txt')
-        #BOW features
-        self.bow_train_path = os.path.join(self.dataset_path,'trn_X_Xf.txt')
-        self.bow_test_path = os.path.join(self.dataset_path,'tst_X_Xf.txt')
-        
 ##----------------------------------------------- Label Features Datasets-----------------------###
 ##-------------------------------------------------------------------------------------------------##
 
@@ -392,54 +309,7 @@ class PathLFAmazonTitles131K:
         #BOW features
         self.bow_train_path = os.path.join(self.dataset_path,'train.txt')
         self.bow_test_path = os.path.join(self.dataset_path,'test.txt')
-        
-        
-class PathMMAmazonTitles300K:
-    '''
-    MM-AmazonTitles-300K Dataset. (multimodal)
-    
-    '''
-    def __init__(self,root_path):
-        
-        self.root_folder = 'MM-AmazonTitles-300K'
-        self.dataset_path = os.path.join(root_path,self.root_folder)
-
-        #Raw text
-        self.raw_text_path = os.path.join(self.dataset_path,'raw_data')
-        self.train_json = os.path.join(self.raw_text_path,'train.json')
-        self.test_json = os.path.join(self.raw_text_path,'test.json')
-        self.label_json = os.path.join(self.raw_text_path,'label.json')
-        self.filter_labels_train = os.path.join(self.dataset_path,'filter_labels_train.txt')
-        self.filter_labels_test = os.path.join(self.dataset_path,'filter_labels_test.txt')
-        #BOW features
-        self.bow_train_path = os.path.join(self.dataset_path,os.path.join('BOW','train.txt'))
-        self.bow_test_path = os.path.join(self.dataset_path,os.path.join('BOW','test.txt'))
-        
-        #Caption files (from BLIP-2)
-        self.train_caption_path = os.path.join(self.raw_text_path,'train_caption.json')
-        self.test_caption_path = os.path.join(self.raw_text_path,'test_caption.json')
-        self.label_caption_path = os.path.join(self.raw_text_path,'label_caption.json')
-        
-        
-class PathLFAmazon131K:
-    '''
-    LF-Amazon-131K Dataset.
-    '''
-    def __init__(self,root_path):
-
-        self.root_folder = 'LF-Amazon-131K'
-        self.dataset_path = os.path.join(root_path,self.root_folder)
-        #Raw text
-        self.raw_text_path = self.dataset_path  # os.path.join(self.dataset_path,'raw_text')
-        self.train_json = os.path.join(self.raw_text_path,'trn.json')
-        self.test_json = os.path.join(self.raw_text_path,'tst.json')
-        self.label_json = os.path.join(self.raw_text_path,'lbl.json')
-        self.filter_labels_train = os.path.join(self.raw_text_path,'filter_labels_train.txt')
-        self.filter_labels_test = os.path.join(self.raw_text_path,'filter_labels_test.txt')
-        #BOW features
-        self.bow_train_path = os.path.join(self.dataset_path,'train.txt')
-        self.bow_test_path = os.path.join(self.dataset_path,'test.txt')
-        
+             
 
 class PathLFWikiSeeAlso320K:
     '''
@@ -473,40 +343,6 @@ class PathLFPaper2keywords:
         self.train_json = os.path.join(self.dataset_path, 'trn.json')
         self.test_json = os.path.join(self.dataset_path, 'tst.json')
         self.label_json = os.path.join(self.dataset_path, 'lbl.json')
-
-
-class PathLFTitle2keywords:
-    '''
-    LF-Title2keywords Dataset.
-    '''
-    def __init__(self, root_path):
-
-        self.root_folder = 'lftitle2keywords'
-        self.dataset_path = os.path.join(root_path, self.root_folder)
-        #Raw text
-        self.train_json = os.path.join(self.dataset_path, 'trn.json')
-        self.test_json = os.path.join(self.dataset_path, 'tst.json')
-        self.label_json = os.path.join(self.dataset_path, 'lbl.json')
-
-class PathLFWikiSeeAlsoTitles320K:
-    '''
-    LF-WikiSeeAlsoTitles-320K Dataset.
-    '''
-    def __init__(self,root_path):
-
-        self.root_folder = 'LF-WikiSeeAlsoTitles-320K'
-        self.dataset_path = os.path.join(root_path,self.root_folder)
-
-        #Raw text
-        self.raw_text_path = os.path.join(self.dataset_path,'raw_text')
-        self.train_json = os.path.join(self.raw_text_path,'trn.json')
-        self.test_json = os.path.join(self.raw_text_path,'tst.json')
-        self.label_json = os.path.join(self.raw_text_path,'lbl.json')
-        self.filter_labels_train = os.path.join(self.raw_text_path,'filter_labels_train.txt')
-        self.filter_labels_test = os.path.join(self.raw_text_path,'filter_labels_test.txt')
-        #BOW features
-        self.bow_train_path = os.path.join(self.dataset_path,'train.txt')
-        self.bow_test_path = os.path.join(self.dataset_path,'test.txt')
 
 
 class PathLFAmazonTitles1P3M:
