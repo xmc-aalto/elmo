@@ -22,9 +22,9 @@ This repository implements end-to-end float8 (FP8) training for the Extreme Mult
 ```
 conda create -y -n elmo python=3.11
 conda activate elmo
-bash setup_env.sh
 git clone https://github.com/xmc-aalto/elmo.git
 cd elmo
+bash setup_env.sh
 
 ```
 
