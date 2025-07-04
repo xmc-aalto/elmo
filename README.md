@@ -44,7 +44,7 @@ Download datasets from the [extreme classification repo](http://manikvarma.org/d
 
 ## Running 
 1. Setup environment based on the installation instructions above.
-2. Run ``python src/main.py data=dataset  dataset_path=./data log_fname=log_dataset ``
+2. Run ``python src/main.py data=dataset  dataset_path=Datasets log_fname=log_dataset ``
 
 [where `dataset_path` is root path and in `data=dataset` dataset argument names are amazon670k, amazontitles670k, wiki500k, amazon3m, lfamazontitles131k, lfamazontitles1.3m, lfwikiseealso320k, lfpaper2keywords]
 
@@ -76,7 +76,7 @@ python src/main.py dataset=amazontitles670k log_fname=log_sfp8_at670k dataset_pa
 
 
 
-### Torchao and NVIDIA RTX 40 series Ada cards(e.g., 4060 Ti)
+**Torchao and NVIDIA RTX 40 series Ada cards(e.g., 4060 Ti)**
 
 Torchao doesn't support FP8 encoder for some Ada cards so encoder could be set to bf16 as its memory is negligible compared to classifier.
 
