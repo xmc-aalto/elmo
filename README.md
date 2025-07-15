@@ -8,7 +8,6 @@ This repository implements end-to-end float8 (FP8) training for the Extreme Mult
 
 👉 You can find the camera-ready paper [here](https://openreview.net/pdf?id=d6CTIPrTTC).
 
-
 ## Key Features
 - ✅ Pure Low Precision (FP8 and BF16) training throughout.
 - ✅ Skip-Loss.
@@ -17,6 +16,10 @@ This repository implements end-to-end float8 (FP8) training for the Extreme Mult
 - ✅ Fused Gradient for Peak Memory Optimization.
 - ✅ FP8 Encoder with torch.ao.
 - ✅ FP8 for XMC layer.
+
+## ELMO Classifier
+<img src="assets/elmo_fig.png" alt="ELMO Architecture" width="600"/>
+
 
 ## Setup
 ```
