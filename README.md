@@ -1,7 +1,7 @@
 # ELMO : Efficiency via Low-precision and Peak Memory Optimization in Large Output Spaces
 ![License](https://img.shields.io/badge/License-MIT-blue.svg)
+![Conference](https://img.shields.io/badge/ICML-2025-brightgreen.svg)
 
-## Details
 Official codebase for the ICML 2025 paper **ELMO: Efficiency via Low-precision and Peak Memory Optimization in Large Output Spaces**. 
 
 This repository implements end-to-end float8 (FP8) training for the Extreme Multi-label Classification (XMC) Classifier. By leveraging techniques such as gradient fusion and memory-efficient chunking, ELMO achieves up to 10x reduction in peak memory usage on datasets with up to 8.6 million labels, enabling scalable training in large output spaces.
@@ -41,26 +41,29 @@ Download datasets from the [extreme classification repo](http://manikvarma.org/d
 -   [LF-AmazonTitles-131K](https://www.dropbox.com/scl/fo/qbt00gbyt35p2h1yz05on/h?rlkey=3bf8dbq3bgns9dvfau4d9d7sx&dl=0)
 -   [LF-WikiSeeAlso-320K](https://drive.google.com/file/d/1QZD4dFVxDpskCI2kGH9IbzgQR1JSZT-N/view)
 -   [LF-AmazonTitles-1.3M](https://www.dropbox.com/scl/fo/k4bz3mrz18rtmbjm7xqzl/h?rlkey=0u9h5p5s0cn7wuhpeu20yhvzn&dl=0)
--  [LF-Paper2keywords-8.6M]()
+-  [LF-Paper2keywords-8.6M](https://drive.google.com/file/d/1aJeqMJ9b5nl3eouBjdFK8uzIA25nlLKK/view?usp=sharing)
 
 
 
 ## Running 
 1. Setup environment based on the installation instructions above.
-2. Run ``python src/main.py data=dataset  dataset_path=Datasets log_fname=log_dataset ``
+2. Run the main script with Hydra-style arguments:
 
-[where `dataset_path` is root path and in `data=dataset` dataset argument names are amazon670k, amazontitles670k, wiki500k, amazon3m, lfamazontitles131k, lfamazontitles1.3m, lfwikiseealso320k, lfpaper2keywords]
+    ```python src/main.py data=<dataset_name> dataset_path=<path_to_datasets> log_fname=<log_file_name>```
+    -   `dataset_path`: The root folder where all datasets are stored.
+    -   `data`: The name of the dataset to use. Options include: `amazon670k`, `amazontitles670k`, `wiki500k`, `amazon3m`, `lfamazontitles131k`, `lfamazontitles1.3m`, `lfwikiseealso320k`, `lfpaper2keywords`.
 
-All training is managed through `src/main.py` and configured using [Hydra]((https://hydra.cc/)). The base configuration for each dataset is located in `config/dataset/`. You can set parameters in the config file or command line. The performance is shown in wandb or log files.
 
 
-## Sample Run Scripts
+All training is managed through `src/main.py` and configured using [Hydra](https://hydra.cc/). The base configuration for each dataset is located in `config/dataset/`. You can set parameters in the config file or command line. The performance is shown in wandb or log files.
+
+
+## Quick Start
 
 **Pure Bfloat16 training on AmazonTitles-670K**
 
 ```bash 
 python src/main.py dataset=amazontitles670k log_fname=log_bf16_at670k dataset_path=Datasets dataset.model.xmc.implementation=chunked
-
 ```
 
 **Pure FP8 Training on AmazonTitles-670K (Require Hopper, Ada, Blackwell cards)**
@@ -98,7 +101,7 @@ python src/main.py dataset=amazontitles670k log_fname=log_fp8_fp8enc_at670k data
 2. [Towards Memory-Efficient Training for Extremely Large Output Spaces – Learning with 500k Labels on a Single Commodity GPU (ECML 2023)](https://github.com/xmc-aalto/ecml23-sparse)
 
 ## Citation
-If you find our work/code useful in your research, please cite the following:
+If you find our work, code, or the `LF-Paper2keywords-8.6M` dataset useful in your research, please cite the following:
 ```bibtex
 @inproceedings{
 zhang2025elmo,
